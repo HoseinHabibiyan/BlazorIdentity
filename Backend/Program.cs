@@ -69,6 +69,14 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseHttpsRedirection();
 
+using (var scope = app.Services.CreateScope())
+{
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+    var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
+
+    await DataSeedExtensions.IdentitySeed(userManager, roleManager);
+}
+
 #region APIs
 
 app.MapPost("/api/account/register", async (AuthInput input, UserManager<IdentityUser> userManager) =>

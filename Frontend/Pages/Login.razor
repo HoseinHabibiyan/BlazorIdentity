@@ -1,0 +1,32 @@
+@using Blazored.LocalStorage
+@using Frontend.Identity
+@inject HttpClient Http
+@inject CustomAuthStateProvider AuthProvider
+@inject ILocalStorageService LocalStorage
+@inject NavigationManager Navigation
+@page "/login"
+<h3>Login</h3>
+
+<EditForm Model="_auth" OnValidSubmit="HandleLogin">
+    <InputText @bind-Value="_auth.Email" placeholder="Email" />
+    <InputText @bind-Value="_auth.Password" placeholder="Password" type="password" />
+    <button type="submit">Login</button>
+</EditForm>
+
+@code {
+    private readonly AuthModel _auth = new();
+
+    private async Task HandleLogin()
+    {
+        var response = await Http.PostAsJsonAsync("/api/account/login", _auth);
+        if (response.IsSuccessStatusCode)
+        {
+            var result = await response.Content.ReadFromJsonAsync<TokenResponse>();
+            await LocalStorage.SetItemAsync( "authToken", result.token);
+            await AuthProvider.GetAuthenticationStateAsync();
+            Navigation.NavigateTo("/");
+        }
+    }
+
+    private class TokenResponse { public string token { get; set; } }
+}

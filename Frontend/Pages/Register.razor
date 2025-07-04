@@ -1,0 +1,25 @@
+@page "/register"
+@using Frontend.Identity
+@inject HttpClient Http
+@inject NavigationManager Navigation
+
+<h3>Register</h3>
+
+<EditForm Model="@_auth" OnValidSubmit="HandleLogin">
+    <InputText @bind-Value="_auth.Email" placeholder="Email" />
+    <InputText @bind-Value="_auth.Password" placeholder="Password" type="password" />
+    <button type="submit">Register</button>
+</EditForm>
+
+@code {
+    readonly AuthModel _auth = new();
+
+    private async Task HandleLogin()
+    {
+        var result = await Http.PostAsJsonAsync("api/account/register", _auth);
+        if (result.IsSuccessStatusCode)
+        {
+            Navigation.NavigateTo("/");
+        }
+    }
+}
