@@ -1,7 +1,10 @@
 ﻿@page "/weather"
+@using System.Net.Http.Headers
+@using Blazored.LocalStorage
 @using Microsoft.AspNetCore.Authorization
 @inject HttpClient Http
-@attribute [Authorize]
+@inject ILocalStorageService LocalStorage
+@attribute [Authorize("Admin")]
 
 <PageTitle>Weather</PageTitle>
 
@@ -45,7 +48,10 @@ else
 
     protected override async Task OnInitializedAsync()
     {
-        forecasts = await Http.GetFromJsonAsync<WeatherForecast[]>("sample-data/weather.json");
+        string? token = await LocalStorage.GetItemAsync<string>("authToken");
+        Http.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+        forecasts = await Http.GetFromJsonAsync<WeatherForecast[]>("/api/weatherforecast");
     }
 
     public class WeatherForecast
@@ -58,5 +64,4 @@ else
 
         public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
     }
-
 }

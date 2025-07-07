@@ -6,11 +6,11 @@ using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Frontend.Identity;
 
-public class CustomAuthStateProvider(ILocalStorageService localStorage, HttpClient http) : AuthenticationStateProvider
+public class CustomAuthStateProvider(ILocalStorageService localStorageService, HttpClient http) : AuthenticationStateProvider
 {
     public override async Task<AuthenticationState> GetAuthenticationStateAsync()
     {
-        string? token = await localStorage.GetItemAsStringAsync("authToken");
+        string? token = await localStorageService.GetItemAsStringAsync("authToken");
 
         var identity = new ClaimsIdentity();
         http.DefaultRequestHeaders.Authorization = null;
@@ -28,6 +28,18 @@ public class CustomAuthStateProvider(ILocalStorageService localStorage, HttpClie
         NotifyAuthenticationStateChanged(Task.FromResult(state));
 
         return state;
+    }
+    
+    public async Task<bool> IsAuthenticated()
+    {
+        string? token = await localStorageService.GetItemAsStringAsync("authToken");
+        return token is not null;
+    }
+    
+    public async Task Logout()
+    {
+       await http.PostAsync("/api/account/logout", null);
+       await localStorageService.RemoveItemAsync( "authToken");
     }
 
     private static IEnumerable<Claim> ParseClaimsFromJwt(string jwt)

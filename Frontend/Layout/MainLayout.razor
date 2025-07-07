@@ -1,4 +1,9 @@
-﻿@inherits LayoutComponentBase
+﻿@using System.Net
+@using Frontend.Identity
+@inherits LayoutComponentBase
+@inject CustomAuthStateProvider AuthProvider
+@inject NavigationManager Navigation
+
 <div class="page">
     <div class="sidebar">
         <NavMenu/>
@@ -6,7 +11,18 @@
 
     <main>
         <div class="top-row px-4">
-            <a href="https://learn.microsoft.com/aspnet/core/" target="_blank">About</a>
+
+            @if (!_isAuthenticated)
+            {
+                <a href="/login">Login</a>
+                <a href="/register">Register</a>
+            }
+
+            @if (_isAuthenticated)
+            {
+                <a href="#" @onclick="Logout">Logout</a>
+            }
+
         </div>
 
         <article class="content px-4">
@@ -14,3 +30,19 @@
         </article>
     </main>
 </div>
+
+@code
+{
+    bool _isAuthenticated;
+
+    protected override async Task OnInitializedAsync()
+    {
+        _isAuthenticated = await AuthProvider.IsAuthenticated();
+    }
+    
+    async Task Logout()
+    {
+        await AuthProvider.Logout();
+        Navigation.NavigateTo("/",true);
+    }
+}

@@ -11,7 +11,7 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddOpenApi();
 
-builder.Services.AddDbContext<AppDbContext>(o=> o.UseInMemoryDatabase("InMemoryDatabase"));
+builder.Services.AddDbContext<AppDbContext>(o => o.UseInMemoryDatabase("InMemoryDatabase"));
 
 #region Identity Configurations
 
@@ -57,7 +57,7 @@ var app = builder.Build();
 if (app.Environment.IsDevelopment())
 {
     app.MapOpenApi();
-    app.MapScalarApiReference(options => 
+    app.MapScalarApiReference(options =>
     {
         options.WithTitle("Identity API");
         options.WithTheme(ScalarTheme.BluePlanet);
@@ -86,15 +86,16 @@ app.MapPost("/api/account/register", async (AuthInput input, UserManager<Identit
     return result.Succeeded ? Results.Ok() : Results.BadRequest(result.Errors);
 });
 
-app.MapPost("/api/account/login", async (AuthInput dto, UserManager<IdentityUser> userManager, TokenService tokenService) =>
-{
-    var user = await userManager.FindByEmailAsync(dto.Email);
-    if (user == null || !await userManager.CheckPasswordAsync(user, dto.Password))
-        return Results.Unauthorized();
+app.MapPost("/api/account/login",
+    async (AuthInput dto, UserManager<IdentityUser> userManager, TokenService tokenService) =>
+    {
+        var user = await userManager.FindByEmailAsync(dto.Email);
+        if (user == null || !await userManager.CheckPasswordAsync(user, dto.Password))
+            return Results.Unauthorized();
 
-    var token = tokenService.Generate(user);
-    return Results.Ok(new { token });
-});
+        var token = tokenService.Generate(user);
+        return Results.Ok(new { token });
+    });
 
 app.MapPost("/api/account/logout", async (SignInManager<IdentityUser> signInManager) =>
 {
@@ -102,6 +103,31 @@ app.MapPost("/api/account/logout", async (SignInManager<IdentityUser> signInMana
     return Results.Ok();
 });
 
+var summaries = new[]
+{
+    "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
+};
+
+app.MapGet("/api/weatherforecast", () =>
+    {
+        var forecast = Enumerable.Range(1, 5).Select(index =>
+                new WeatherForecast
+                (
+                    DateOnly.FromDateTime(DateTime.Now.AddDays(index)),
+                    Random.Shared.Next(-20, 55),
+                    summaries[Random.Shared.Next(summaries.Length)]
+                ))
+            .ToArray();
+        return forecast;
+    })
+    .RequireAuthorization("Admin")
+    .WithName("WeatherForecast");
+
 #endregion
 
 app.Run();
+
+record WeatherForecast(DateOnly Date, int TemperatureC, string? Summary)
+{
+    public int TemperatureF => 32 + (int)(TemperatureC / 0.5556);
+}

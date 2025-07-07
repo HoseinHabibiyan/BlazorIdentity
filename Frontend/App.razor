@@ -1,7 +1,14 @@
 ﻿@using Microsoft.AspNetCore.Components.Authorization
+@inject NavigationManager NavigationManager
+
 <Router AppAssembly="@typeof(App).Assembly">
     <Found Context="routeData">
-        <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)"/>
+        <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+            <Authorizing></Authorizing>
+            <NotAuthorized>
+                <div class="alert alert-danger">You are not authorized to access this page</div>
+            </NotAuthorized>
+        </AuthorizeRouteView>
         <FocusOnNavigate RouteData="@routeData" Selector="h1"/>
     </Found>
     <NotFound>
