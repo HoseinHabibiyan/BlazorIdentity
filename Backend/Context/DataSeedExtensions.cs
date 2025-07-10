@@ -1,22 +1,23 @@
+using Backend.Identity;
 using Microsoft.AspNetCore.Identity;
 
 namespace Backend.Context;
 
 public static class DataSeedExtensions
 {
-    public static async Task IdentitySeed(UserManager<IdentityUser> userManager, RoleManager<IdentityRole> roleManager)
+    public static async Task IdentitySeed(UserManager<ApplicationUser> userManager, RoleManager<IdentityRole> roleManager)
     {
-        var adminRole = "Admin";
+        string adminRole = "Admin";
         if (!await roleManager.RoleExistsAsync(adminRole))
         {
             await roleManager.CreateAsync(new IdentityRole(adminRole));
         }
 
         string adminEmail = "admin@gmail.com";
-        var admin = await userManager.FindByEmailAsync(adminEmail);
-        if (admin == null)
+        ApplicationUser? admin = await userManager.FindByEmailAsync(adminEmail);
+        if (admin is null)
         {
-            admin = new IdentityUser
+            admin = new ApplicationUser
             {
                 UserName = adminEmail,
                 Email = adminEmail,
@@ -30,6 +31,20 @@ public static class DataSeedExtensions
         if (!await roleManager.RoleExistsAsync(userRole))
         {
             await roleManager.CreateAsync(new IdentityRole(userRole));
+        }
+        
+        string userEmail = "user@gmail.com";
+        ApplicationUser? user = await userManager.FindByEmailAsync(userEmail);
+        if (user is null)
+        {
+            user = new ApplicationUser
+            {
+                UserName = userEmail,
+                Email = userEmail,
+                EmailConfirmed = true
+            };
+            await userManager.CreateAsync(user, "123456");
+            await userManager.AddToRoleAsync(user, userRole);
         }
     }
 }

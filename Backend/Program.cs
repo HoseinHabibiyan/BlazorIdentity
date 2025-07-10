@@ -1,7 +1,9 @@
+using System.Security.Claims;
 using System.Text;
 using Backend.Context;
 using Backend.Identity;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
@@ -15,7 +17,7 @@ builder.Services.AddDbContext<AppDbContext>(o => o.UseInMemoryDatabase("InMemory
 
 #region Identity Configurations
 
-builder.Services.AddIdentity<IdentityUser, IdentityRole>(o =>
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(o =>
     {
         o.Password.RequireDigit = false;
         o.Password.RequireLowercase = false;
@@ -40,7 +42,9 @@ builder.Services.AddAuthentication(options =>
         ValidateAudience = false,
         ValidateLifetime = true,
         ValidateIssuerSigningKey = true,
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JWT:Issuer"]!))
+        ValidAudience = builder.Configuration["JWT:Audience"],
+        ValidIssuer = builder.Configuration["JWT:Issuer"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["JWT:Secret"]!))
     };
 });
 
@@ -71,7 +75,7 @@ app.UseHttpsRedirection();
 
 using (var scope = app.Services.CreateScope())
 {
-    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<IdentityUser>>();
+    var userManager = scope.ServiceProvider.GetRequiredService<UserManager<ApplicationUser>>();
     var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole>>();
 
     await DataSeedExtensions.IdentitySeed(userManager, roleManager);
@@ -79,25 +83,60 @@ using (var scope = app.Services.CreateScope())
 
 #region APIs
 
-app.MapPost("/api/account/register", async (AuthInput input, UserManager<IdentityUser> userManager) =>
+app.MapPost("/api/account/register", async (AuthInput input, UserManager<ApplicationUser> userManager) =>
 {
-    var user = new IdentityUser { UserName = input.Email, Email = input.Email };
-    var result = await userManager.CreateAsync(user, input.Password);
+    ApplicationUser user = new()
+    {
+        FirstName = input.FirstName,
+        LastName = input.LastName,
+        UserName = input.Email,
+        Email = input.Email,
+        
+    };
+    IdentityResult result = await userManager.CreateAsync(user, input.Password);
     return result.Succeeded ? Results.Ok() : Results.BadRequest(result.Errors);
 });
 
 app.MapPost("/api/account/login",
-    async (AuthInput dto, UserManager<IdentityUser> userManager, TokenService tokenService) =>
+    async (AuthInput auth, UserManager<ApplicationUser> userManager, TokenService tokenService) =>
     {
-        var user = await userManager.FindByEmailAsync(dto.Email);
-        if (user == null || !await userManager.CheckPasswordAsync(user, dto.Password))
+        ApplicationUser? user = await userManager.FindByEmailAsync(auth.Email);
+        if (user is null || !await userManager.CheckPasswordAsync(user, auth.Password))
             return Results.Unauthorized();
-
-        var token = tokenService.Generate(user);
-        return Results.Ok(new { token });
+        
+        string accessToken = await tokenService.GenerateAccessToken(user);
+        string refreshToken = tokenService.GenerateRefreshToken();
+        
+        user.RefreshToken = refreshToken;
+        user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+        await userManager.UpdateAsync(user);
+        
+        return Results.Ok(new { accessToken , refreshToken });
     });
 
-app.MapPost("/api/account/logout", async (SignInManager<IdentityUser> signInManager) =>
+app.MapPost("/api/account/refreshToken",
+    async (TokenModel input, UserManager<ApplicationUser> userManager, TokenService tokenService) =>
+    {
+        ClaimsPrincipal principal = tokenService.GetPrincipalFromExpiredToken(input.AccessToken);
+        
+        ApplicationUser? user = await userManager.FindByEmailAsync(principal.Identity?.Name!);
+
+        if (user is null || user.RefreshToken != input.RefreshToken || user.RefreshTokenExpiryTime < DateTime.UtcNow)
+        {
+            return Results.Unauthorized();
+        }
+        
+        string accessToken = await tokenService.GenerateAccessToken(user);
+        string refreshToken = tokenService.GenerateRefreshToken();
+        
+        user.RefreshToken = refreshToken;
+        user.RefreshTokenExpiryTime = DateTime.UtcNow.AddDays(7);
+        await userManager.UpdateAsync(user);
+        
+        return Results.Ok(new { accessToken , refreshToken });
+    });
+
+app.MapPost("/api/account/logout", async (SignInManager<ApplicationUser> signInManager) =>
 {
     await signInManager.SignOutAsync();
     return Results.Ok();
@@ -108,7 +147,7 @@ var summaries = new[]
     "Freezing", "Bracing", "Chilly", "Cool", "Mild", "Warm", "Balmy", "Hot", "Sweltering", "Scorching"
 };
 
-app.MapGet("/api/weatherforecast", () =>
+app.MapGet("/api/weatherforecast", [Authorize(Roles = "Admin")]() =>
     {
         var forecast = Enumerable.Range(1, 5).Select(index =>
                 new WeatherForecast
@@ -120,7 +159,6 @@ app.MapGet("/api/weatherforecast", () =>
             .ToArray();
         return forecast;
     })
-    .RequireAuthorization("Admin")
     .WithName("WeatherForecast");
 
 #endregion

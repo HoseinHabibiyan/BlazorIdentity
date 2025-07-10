@@ -11,19 +11,29 @@
         <h3>Login</h3>
     </div>
 
+    @if (errorMessage is not null)
+    {
+        <div class="d-flex justify-content-center align-items-center flex-column w-100">
+            <div class="alert alert-danger w-100 text-center">
+                @errorMessage
+            </div>
+        </div>
+    }
+
     <EditForm Model="_auth" OnValidSubmit="HandleLogin">
         <div class="mb-2">
-            <InputText @bind-Value="_auth.Email" class="form-control" placeholder="Email" />
+            <InputText @bind-Value="_auth.Email" class="form-control" placeholder="Email"/>
         </div>
         <div class="mb-2">
-            <InputText @bind-Value="_auth.Password"  class="form-control" placeholder="Password" type="password" />
+            <InputText @bind-Value="_auth.Password" class="form-control" placeholder="Password" type="password"/>
         </div>
-        <button type="submit"  class="btn btn-primary">Login</button>
+        <button type="submit" class="btn btn-primary">Login</button>
     </EditForm>
 </div>
 
 @code {
     private readonly AuthModel _auth = new();
+    private string? errorMessage;
 
     private async Task HandleLogin()
     {
@@ -31,11 +41,20 @@
         if (response.IsSuccessStatusCode)
         {
             var result = await response.Content.ReadFromJsonAsync<TokenResponse>();
-            await LocalStorage.SetItemAsync( "authToken", result?.token);
+            await LocalStorage.SetItemAsync("authToken", result?.accessToken);
             await AuthProvider.GetAuthenticationStateAsync();
-            Navigation.NavigateTo("/",true);
+            Navigation.NavigateTo("/", true);
+        }
+        else
+        {
+            errorMessage = "Incorrect email or password";
         }
     }
 
-    private class TokenResponse { public string token { get; set; } }
+    private class TokenResponse
+    {
+        public string accessToken { get; set; }
+        public string refreshToken { get; set; }
+    }
+
 }
